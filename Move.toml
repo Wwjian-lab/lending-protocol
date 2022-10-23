@@ -3,7 +3,10 @@ name = "lending"
 version = "0.0.0"
 
 [dependencies]
-MoveStdlib = { git = "https://github.com/move-language/move.git", subdir = "language/move-stdlib", rev = "main" }
+
+AptosFramework = { local = "../aptos-core/aptos-move/framework/aptos-framework/" }
+
 
 [addresses]
 std =  "0x1"
+lending_protocol = "0x2"

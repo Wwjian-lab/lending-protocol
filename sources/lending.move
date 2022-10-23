@@ -137,7 +137,7 @@ module lending_protocol::lending_protocol {
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
 
         // totoal coin in valut
-        let cash = borrow_global_mut<Cash<CoinType>>(signer::address_of(user));
+        let cash = borrow_global_mut<Cash<CoinType>>(@lending_protocol);
         // get user coin
         let coin = coin::withdraw<CoinType>(user, amount);
 
@@ -174,7 +174,7 @@ module lending_protocol::lending_protocol {
         assert!(withdraw_allowd(amount) == true, ERR_INSUFFICIENT_COLLATERAL);
 
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
-        let cash = borrow_global_mut<Cash<CoinType>>(signer::address_of(user));
+        let cash = borrow_global_mut<Cash<CoinType>>(@lending_protocol);
 
         // record
         let coin = coin::extract(&mut cash.value, amount);
@@ -209,7 +209,7 @@ module lending_protocol::lending_protocol {
         assert!(borrow_allowed(amount) == true, ERR_INSUFFICIENT_COLLATERAL);
 
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
-        let cash = borrow_global_mut<Cash<CoinType>>(signer::address_of(user));
+        let cash = borrow_global_mut<Cash<CoinType>>(@lending_protocol);
 
         // one-time loan interest
         let reserve = amount * pool.borrow_rate / 100;
@@ -273,6 +273,13 @@ module lending_protocol::lending_protocol {
         let pid = get_pool_id<CoinType>(protocol);
         let pool = vector::borrow_mut(&mut protocol.pools, pid);
         pool.is_active = false;
+    }
+
+    public entry fun get_reserve<CoinType>(admin: &signer) acquires Cash {
+        assert!(signer::address_of(admin) == @lending_protocol, ERR_NOT_ADMIN);
+        let cash = borrow_global_mut<Cash<CoinType>>(@lending_protocol);
+        let coin = coin::extract_all(&mut cash.value);
+        coin::deposit<CoinType>(signer::address_of(admin), coin);
     }
 
     // ========= internal =========

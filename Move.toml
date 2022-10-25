@@ -9,4 +9,4 @@ AptosFramework = { local = "../aptos-core/aptos-move/framework/aptos-framework/"
 
 [addresses]
 std =  "0x1"
-lending_protocol = "0x2"
+lending_protocol = "0x663"

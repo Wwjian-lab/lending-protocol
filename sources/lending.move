@@ -300,16 +300,16 @@ module lending_protocol::lending_protocol {
     }
 
     fun get_hypothetical_account_liquidity_internal(
-        lending_protocl: &mut LendingProtocol,
+        lending_protocol: &mut LendingProtocol,
         user_position: &mut UserPositions,
     ): bool {
-        let pool_number = vector::length<LendingPool>(&lending_protocl.pools);
+        let pool_number = vector::length<LendingPool>(&lending_protocol.pools);
         // let length = simple_map::length<u64, DepositPosition>(&user_position.deposits);
         let idx = 0u64;
         let total_colleteral_USD_value: u64 = 0;
         let total_borrow_USD_value: u64 = 0;
         while ( idx < pool_number ) {
-            let pool = vector::borrow<LendingPool>(&lending_protocl.pools, idx);
+            let pool = vector::borrow<LendingPool>(&lending_protocol.pools, idx);
             let coin_type = pool.coin_type;
             if ( simple_map::contains_key<u64, DepositPosition>(&user_position.deposits, &idx) ){
                 let user_deposit_postision = simple_map::borrow<u64, DepositPosition>(&user_position.deposits, &idx);

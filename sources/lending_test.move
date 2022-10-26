@@ -4,19 +4,32 @@ module lending_protocol::test {
 
     use std::signer::address_of;
     use std::string;
+    use std::account;
     // use std::vector;
-    use std::account as sys_account;
 
     use aptos_framework::coin;
+    use aptos_framework::timestamp;
 
-    struct FakeMoney {}
     struct AptTest {}
     struct EthTest {}
+    struct BtcTest {}
 
-    struct FakeMoneyCapabilities has key {
-        burn_cap: coin::BurnCapability<FakeMoney>,
-        freeze_cap: coin::FreezeCapability<FakeMoney>,
-        mint_cap: coin::MintCapability<FakeMoney>,
+    struct CoinsVault has key {
+        apt: coin::Coin<AptTest>,
+        eth: coin::Coin<EthTest>,
+        btc: coin::Coin<BtcTest>,
+
+        apt_burn: coin::BurnCapability<AptTest>,
+        apt_freeze: coin::FreezeCapability<AptTest>,
+        apt_mint: coin::MintCapability<AptTest>,
+
+        eth_burn: coin::BurnCapability<EthTest>,
+        eth_freeze: coin::FreezeCapability<EthTest>,
+        eth_mint: coin::MintCapability<EthTest>,
+
+        btc_burn: coin::BurnCapability<BtcTest>,
+        btc_freeze: coin::FreezeCapability<BtcTest>,
+        btc_mint: coin::MintCapability<BtcTest>,
     }
 
     const MINT_AMOUNT: u64 = 100000;
@@ -24,43 +37,78 @@ module lending_protocol::test {
     // ========= test =========
     #[test(admin=@lending_protocol)]
     public entry fun test_init(admin: &signer) {
-        sys_account::create_account_for_test(address_of(admin));
+        account::create_account_for_test(address_of(admin));
         lending_protocol::init(admin);
     }
 
-    #[test(admin=@lending_protocol, userA=@0x10, intrest_rate=@1)]
-    public entry fun test_add_pool(admin: &signer, userA: &signer, intrest_rate: u64) {
-        // coin::create_fake_money(admin, userA, MINT_AMOUNT);
-        sys_account::create_account_for_test(address_of(admin));
-        sys_account::create_account_for_test(address_of(userA));
-        create_fake_money_to(admin, userA, MINT_AMOUNT);
-        lending_protocol::add_pool<FakeMoney>(admin, intrest_rate);
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptss_framework_admin=@0x1)]
+    public entry fun test_add_pool(admin: &signer, userA: &signer, userB: &signer, aptss_framework_admin: &signer){
+        // let intrest_rate = 1;
+        account::create_account_for_test(address_of(admin));
+        account::create_account_for_test(address_of(userA));
+        account::create_account_for_test(address_of(userB));
+        lending_protocol::init(admin);
+        init_coin_and_fund_user(admin, userA, userB);
+        timestamp::set_time_has_started_for_testing(aptss_framework_admin);
     }
 
     // ========= test_only =========
     #[test_only]
-    fun initialize_and_register_token(
-        account: &signer
-    ): (coin::BurnCapability<FakeMoney>, coin::FreezeCapability<FakeMoney>, coin::MintCapability<FakeMoney>)
-    {
-        let name = string::utf8(b"eth");
-        let symbol = string::utf8(b"ETH");
-        let decimals = 8u8;
-        let (eth_burn, eth_freeze, eth_mint) = coin::initialize<FakeMoney>(account, copy name, symbol, decimals, false);
-        coin::register<FakeMoney>(account);
-        (eth_burn, eth_freeze, eth_mint)
-    }
+    fun init_coin_and_fund_user(admin: &signer, userA: &signer, userB: &signer) {
+        let decimals = 18u8;
+        let name = string::utf8(b"name");
+        // 1. initialze
+        let (apt_burn, apt_freeze, apt_mint) = coin::initialize<AptTest>(admin, name, name, decimals, false);
+        let (eth_burn, eth_freeze, eth_mint) = coin::initialize<EthTest>(admin, name, name, decimals, false);
+        let (btc_burn, btc_freeze, btc_mint) = coin::initialize<BtcTest>(admin, name, name, decimals, false);
+        
+        // 2.TODO: register
+        coin::register<AptTest>(userA);
+        coin::register<EthTest>(userA);
+        coin::register<BtcTest>(userA);
 
-    #[test_only]
-    fun create_fake_money_to(
-        source: &signer,
-        destination: &signer,
-        amount: u64
-    ) {
-        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_token(source);
-        coin::register<FakeMoney>(destination);
-        let coins_minted = coin::mint<FakeMoney>(amount, &mint_cap);
-        coin::deposit(address_of(source), coins_minted);
-        move_to(source, FakeMoneyCapabilities{burn_cap, freeze_cap, mint_cap});
+        coin::register<AptTest>(userB);
+        coin::register<EthTest>(userB);
+        coin::register<BtcTest>(userB);
+        // 3. mint
+        let apt_minted_vault = coin::mint<AptTest>(MINT_AMOUNT, &apt_mint);
+        let eth_minted_vault = coin::mint<EthTest>(MINT_AMOUNT, &eth_mint);
+        let btc_minted_vault = coin::mint<BtcTest>(MINT_AMOUNT, &btc_mint);
+
+        let apt_mintedA = coin::extract<AptTest>(&mut apt_minted_vault, MINT_AMOUNT/4);
+        let eth_mintedA = coin::extract<EthTest>(&mut eth_minted_vault, MINT_AMOUNT/4);
+        let btc_mintedA = coin::extract<BtcTest>(&mut btc_minted_vault, MINT_AMOUNT/4);
+
+        let apt_mintedB = coin::extract<AptTest>(&mut apt_minted_vault, MINT_AMOUNT/4);
+        let eth_mintedB = coin::extract<EthTest>(&mut eth_minted_vault, MINT_AMOUNT/4);
+        let btc_mintedB = coin::extract<BtcTest>(&mut btc_minted_vault, MINT_AMOUNT/4);
+        
+        // 4. deposit to destination account
+        coin::deposit(address_of(userA), apt_mintedA);
+        coin::deposit(address_of(userA), eth_mintedA);
+        coin::deposit(address_of(userA), btc_mintedA);
+
+        coin::deposit(address_of(userA), apt_mintedB);
+        coin::deposit(address_of(userA), eth_mintedB);
+        coin::deposit(address_of(userA), btc_mintedB);
+
+        // 5. vault store
+        move_to(admin, CoinsVault{
+            apt: apt_minted_vault,
+            eth: eth_minted_vault,
+            btc: btc_minted_vault,
+
+            apt_burn: apt_burn,
+            apt_freeze: apt_freeze,
+            apt_mint: apt_mint,
+
+            eth_burn: eth_burn,
+            eth_freeze: eth_freeze,
+            eth_mint: eth_mint,
+
+            btc_burn: btc_burn,
+            btc_freeze: btc_freeze,
+            btc_mint: btc_mint
+        });
     }
 }

@@ -10,6 +10,7 @@ module lending_protocol::lending_protocol {
 
     use aptos_std::type_info;
     use aptos_std::simple_map;
+    use aptos_std::debug;
 
     use lending_protocol::oracle;
 
@@ -148,6 +149,12 @@ module lending_protocol::lending_protocol {
         coin::merge(&mut cash.value, coin);
 
         pool.total_deposit = pool.total_deposit + amount;
+
+        if (!simple_map::contains_key<u64, DepositPosition>(&user_positions.deposits, &pid)) {
+            // TODO: as_collateral
+            simple_map::add<u64, DepositPosition>(&mut user_positions.deposits, pid, DepositPosition{deposit_amount:0, as_collateral: true});
+        };
+
         let user_deposit = simple_map::borrow_mut(&mut user_positions.deposits, &pid);
         user_deposit.deposit_amount = user_deposit.deposit_amount + amount;
 
@@ -161,7 +168,7 @@ module lending_protocol::lending_protocol {
     {
         // make sure the protocol has been initialized
         assert_user_pool(signer::address_of(user));
-
+        debug::print<u64>(&1);
         let protocol = borrow_global_mut<LendingProtocol>(@lending_protocol);
 
         // get pool id && pool
@@ -302,27 +309,43 @@ module lending_protocol::lending_protocol {
     fun get_hypothetical_account_liquidity_internal(
         lending_protocol: &mut LendingProtocol,
         user_position: &mut UserPositions,
-    ): bool {
+    ): bool { // TODO:
         let pool_number = vector::length<LendingPool>(&lending_protocol.pools);
         // let length = simple_map::length<u64, DepositPosition>(&user_position.deposits);
         let idx = 0u64;
         let total_colleteral_USD_value: u64 = 0;
         let total_borrow_USD_value: u64 = 0;
         while ( idx < pool_number ) {
+
+            // get lenging pool
             let pool = vector::borrow<LendingPool>(&lending_protocol.pools, idx);
+
             let coin_type = pool.coin_type;
+
+            // if user have deposited this coin
             if ( simple_map::contains_key<u64, DepositPosition>(&user_position.deposits, &idx) ){
+                debug::print<u64>(&33);
                 let user_deposit_postision = simple_map::borrow<u64, DepositPosition>(&user_position.deposits, &idx);
                 if ( user_deposit_postision.as_collateral ){
-                    // TODO:
                     total_colleteral_USD_value = total_colleteral_USD_value + user_deposit_postision.deposit_amount * oracle::get_usd_price(coin_type);
-                };
+                } else {
+                    // TODO:
+                }
+
+            };
+
+            // if user have borrowed this coin
+            if ( simple_map::contains_key<u64, BorrowPosition>(&user_position.borrows, &idx) ){
+                debug::print<u64>(&44);
                 let user_borrow_position = simple_map::borrow<u64, BorrowPosition>(&user_position.borrows, &idx);
-                // TODO:
                 total_borrow_USD_value = total_borrow_USD_value + user_borrow_position.borrow_amount * oracle::get_usd_price(coin_type);
             };
+
             idx = idx+1;
         };
+
+        debug::print<u64>(&total_colleteral_USD_value);
+        debug::print<u64>(&total_borrow_USD_value);
         // colleteral factor = 80%
         return total_colleteral_USD_value * 80 > total_borrow_USD_value * 100
     }

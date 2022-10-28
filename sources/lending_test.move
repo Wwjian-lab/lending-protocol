@@ -11,7 +11,7 @@ module lending_protocol::test {
     use aptos_framework::timestamp;
 
     use aptos_std::debug;
-    use aptos_std::type_info;
+    // use aptos_std::type_info;
 
     struct AptTest {}
     struct EthTest {}
@@ -54,13 +54,11 @@ module lending_protocol::test {
     public entry fun test_deposit(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
         // init
         before_user_operate(admin, userA, userB, aptos_framework_admin);
-
-        debug::print<type_info::TypeInfo>(&type_info::type_of<AptTest>());
         
         // test deposit
         let deposit_amount = 200;
-        lending_protocol::deposit<AptTest>(userA, 200);
-        lending_protocol::deposit<AptTest>(userA, 200);
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
 
         // assert balance
         debug::print<u64>(&coin::balance<AptTest>(address_of(userA)));
@@ -70,14 +68,48 @@ module lending_protocol::test {
     #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
     public entry fun test_withdraw(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
         // init
-        // before_user_operate(admin, userA, userB, aptos_framework_admin);
-        
-        test_deposit(admin, userA, userB, aptos_framework_admin);
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
 
-        let withdraw_amount = 100;
+        // withdraw half
+        let deposit_amount = 400;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        let withdraw_amount = 200;
+        lending_protocol::withdraw<AptTest>(userA, withdraw_amount);     
+
+        // widraw all
+        let deposit_amount = 400;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        let withdraw_amount = 400;
         lending_protocol::withdraw<AptTest>(userA, withdraw_amount);
 
     }
+
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_borrow(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        // init
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+        
+        let deposit_amount = 400;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        let borrow_amount = 100;
+        lending_protocol::borrow<AptTest>(userA, borrow_amount);
+
+    }
+
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_repay(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+        
+        let deposit_amount = 400;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        let borrow_amount = 100;
+        lending_protocol::borrow<AptTest>(userA, borrow_amount);
+
+        // overpayment
+        lending_protocol::repay<AptTest>(userA, borrow_amount * borrow_amount);
+    }
+  
 
     // ========= test_only =========
     #[test_only]
@@ -140,6 +172,7 @@ module lending_protocol::test {
     }
     
     // init protocol, pool and fund users
+    #[test_only]
     fun before_user_operate(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
         init_all_accounts(admin, userA, userB);
         lending_protocol::init(admin);
@@ -148,12 +181,14 @@ module lending_protocol::test {
         init_all_pool(admin);
     }
 
+    #[test_only]
     fun init_all_pool(admin: &signer) {
         lending_protocol::add_pool<AptTest>(admin, 1);
         lending_protocol::add_pool<EthTest>(admin, 2);
         lending_protocol::add_pool<BtcTest>(admin, 3);
     }
-
+    
+    #[test_only]
     fun init_all_accounts(userA: &signer, userB: &signer, userC: &signer) {
         account::create_account_for_test(address_of(userA));
         account::create_account_for_test(address_of(userB));

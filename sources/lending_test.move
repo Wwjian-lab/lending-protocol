@@ -137,6 +137,35 @@ module lending_protocol::test {
         assert!(expected_repay_amount == balance_before - balance_after, ERR_TEST_ERR);
     }
 
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_supply_rate(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+
+        let deposit_amount_A = 500;
+        let borrow_amount_A = 1;
+        let deposit_amount_B = 1000;
+        let time_duration = 10 ;
+        let apt_intrest_rate = 1;
+         
+        
+        // userA as a borrower, provide interest
+        lending_protocol::deposit<AptTest>(userA, deposit_amount_A);
+        lending_protocol::borrow<AptTest>(userA, borrow_amount_A);
+
+        // userB as a beneficiary
+        lending_protocol::deposit<AptTest>(userB, deposit_amount_B);
+        timestamp::fast_forward_seconds(time_duration);
+        let expected_withdraw_amount: u64 =  apt_intrest_rate * time_duration * borrow_amount_A + deposit_amount_B;
+
+        let balance_before = coin::balance<AptTest>(address_of(userB));
+        lending_protocol::withdraw<AptTest>(userB, 1010);
+        let balance_after = coin::balance<AptTest>(address_of(userB));
+
+        debug::print<u64>(&balance_before);
+        debug::print<u64>(&balance_after);
+        assert!(expected_withdraw_amount == balance_before - balance_after, ERR_TEST_ERR);
+    }
+
     // ========= test_only =========
     #[test_only]
     fun init_coin_and_fund_user(admin: &signer, userA: &signer, userB: &signer) {

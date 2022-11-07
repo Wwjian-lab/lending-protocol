@@ -220,13 +220,28 @@ module lending_protocol::lending_protocol {
         // TODO: enough share to withdraw
         let share_to_withdraw = (amount as u128) / exchange_share_rate_stored;
 
-        let coin = coin::extract(&mut cash.value, amount);
+        let amount_stored = user_deposit.pool_share * exchange_share_rate_stored;
 
-        pool.total_deposit = pool.total_deposit - amount;
+        // TODO:
+        let actual_withdraw_amount = 0;
+        let actual_withdraw_share = 0;
 
-        user_deposit.deposit_amount = user_deposit.deposit_amount - amount;
-        user_deposit.pool_share = user_deposit.pool_share - share_to_withdraw;
-        pool.totoal_supply_share =  pool.totoal_supply_share - share_to_withdraw;
+        if ( (amount as u128) >= amount_stored) {
+            actual_withdraw_amount = (amount_stored as u64);
+            actual_withdraw_share = user_deposit.pool_share;
+        } else {
+            actual_withdraw_amount = amount;
+            actual_withdraw_share = share_to_withdraw;
+        };
+
+        let coin = coin::extract(&mut cash.value, actual_withdraw_amount);
+
+        // TODO:
+        // pool.total_deposit = pool.total_deposit - amount;
+
+        user_deposit.deposit_amount = user_deposit.deposit_amount - actual_withdraw_amount;
+        user_deposit.pool_share = user_deposit.pool_share - actual_withdraw_share;
+        pool.totoal_supply_share =  pool.totoal_supply_share - actual_withdraw_share;
 
         // transfer coin
         ensure_account_registered<CoinType>(user);

@@ -28,6 +28,7 @@ module lending_protocol::lending_protocol {
 
     // const 
     const INDEX_ONE: u128 = 100000000000000000;
+    const INITIAL_EXCHANGE_RATE: u128 = 100000000000000000;
 
     struct LendingProtocol has key, store {
         pools: vector<LendingPool>,
@@ -98,6 +99,9 @@ module lending_protocol::lending_protocol {
 
         assert!(coin::is_coin_initialized<CoinType>(), ERR_INVALID_COIN);
 
+        // regist address
+        coin::register<CoinType>(account);
+
         let protocol = borrow_global_mut<LendingProtocol>(@lending_protocol);
 
         let now = timestamp::now_microseconds();
@@ -159,8 +163,6 @@ module lending_protocol::lending_protocol {
         // make sure amont
         let amount = coin::value(&coin);
 
-        coin::merge(&mut cash.value, coin);
-
         pool.total_deposit = pool.total_deposit + amount;
 
         if (!simple_map::contains_key<u64, DepositPosition>(&user_positions.deposits, &pid)) {
@@ -177,6 +179,8 @@ module lending_protocol::lending_protocol {
         user_deposit.pool_share =  user_deposit.pool_share + share_actual;
         user_deposit.deposit_amount = user_deposit.deposit_amount + amount;
         pool.totoal_supply_share = pool.totoal_supply_share + share_actual;
+
+        coin::merge(&mut cash.value, coin);
 
     }
 
@@ -319,11 +323,12 @@ module lending_protocol::lending_protocol {
 
         let borrow_balance_stored = get_borrow_balance_stored(pool, borrow_position);
 
-        // repay max amount TODO: ternary operation
-        if ( borrow_position.borrow_amount <= amount ) {
-            amount = (borrow_balance_stored as u64); // TODO:
+        // repay max amount
+        if ( borrow_balance_stored <= (amount as u128) ) {
+            amount = (borrow_balance_stored as u64);
         };
 
+        
         let coin = coin::withdraw<CoinType>(user, amount);
 
         // update
@@ -364,36 +369,48 @@ module lending_protocol::lending_protocol {
     }
 
 
-    public entry fun get_account_snapshot<CoinType>(user: &signer)
-        acquires
-    LendingProtocol,
-    UserPositions 
-    {
-        let protocol = borrow_global_mut<LendingProtocol>(@lending_protocol);
-        let pid = get_pool_id<CoinType>(protocol);
-        let pool = vector::borrow_mut(&mut protocol.pools, pid);
-        let user_positions = borrow_global<UserPositions>(signer::address_of(user));
-        let deposit_position = simple_map::borrow(&user_positions.deposits, &pid);
-        let borrow_positon = simple_map::borrow(&user_positions.borrows, &pid);
-        let borrow_balance_stored = get_borrow_balance_stored(pool, borrow_positon);
-    }
+    // public entry fun get_account_snapshot<CoinType>(user: &signer)
+    //     acquires
+    // LendingProtocol,
+    // UserPositions 
+    // {
+    //     let protocol = borrow_global_mut<LendingProtocol>(@lending_protocol);
+    //     let pid = get_pool_id<CoinType>(protocol);
+    //     let pool = vector::borrow_mut(&mut protocol.pools, pid);
+    //     let user_positions = borrow_global<UserPositions>(signer::address_of(user));
+    //     let deposit_position = simple_map::borrow(&user_positions.deposits, &pid);
+    //     let borrow_positon = simple_map::borrow(&user_positions.borrows, &pid);
+    //     let borrow_balance_stored = get_borrow_balance_stored(pool, borrow_positon);
+    // }
 
     // ========= internal =========
     fun accrue_intrest(pool: &mut LendingPool) { // TODO: Math problem
         let now_sec = timestamp::now_seconds();
         let delta_time = now_sec - pool.last_accrued;
-        let total_borrow_new = pool.total_borrow + delta_time * pool.intrest_per_second;
-        let borrow_index_new = ( total_borrow_new as u128 )+ pool.borrow_index;
+        if ( delta_time == 0 ) {
+            return 
+        };
+        let intrest_facotor = delta_time * pool.intrest_per_second;
+        let interest_accumulated = pool.total_borrow * intrest_facotor;
+        let total_borrow_new = pool.total_borrow + interest_accumulated;
+        let borrow_index_new = ( intrest_facotor as u128 ) * pool.borrow_index + pool.borrow_index; // TODO:
         pool.borrow_index = borrow_index_new;
+        pool.last_accrued = now_sec;
         pool.total_borrow = total_borrow_new;
     }
 
     fun get_borrow_balance_stored(pool: &LendingPool, borrow_position: &BorrowPosition): u128 {
-        (borrow_position.borrow_amount as u128) * borrow_position.intreset_index / pool.borrow_index
+        if ( borrow_position.borrow_amount == 0 ) {
+            return 0
+        };
+        (borrow_position.borrow_amount as u128) * pool.borrow_index / borrow_position.intreset_index
     }
 
     fun exchange_share_rate_stored<CoinType>(pool: &LendingPool): u128
     {
+        if ( pool.totoal_supply_share == 0 ) {
+            return INITIAL_EXCHANGE_RATE
+        };
         let cash = coin::balance<CoinType>(@lending_protocol);
         ((cash + pool.total_borrow) as u128 ) / pool.totoal_supply_share
     }

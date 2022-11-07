@@ -38,6 +38,8 @@ module lending_protocol::test {
     const TOTAL_VAULT: u64 = 1000000000;
     const USER_INIT_AMOUNT: u64 = 5000;
 
+    const ERR_TEST_ERR: u64 = 4444;
+
     // ========= test =========
     #[test(admin=@lending_protocol)]
     public entry fun test_init(admin: &signer) {
@@ -61,8 +63,8 @@ module lending_protocol::test {
         lending_protocol::deposit<AptTest>(userA, deposit_amount);
 
         // assert balance
-        debug::print<u64>(&coin::balance<AptTest>(address_of(userA)));
-        assert!( coin::balance<AptTest>(address_of(userA)) == USER_INIT_AMOUNT - 2 * deposit_amount, 30 );
+        // debug::print<u64>(&coin::balance<AptTest>(address_of(userA)));
+        assert!( coin::balance<AptTest>(address_of(userA)) == USER_INIT_AMOUNT - 2 * deposit_amount, ERR_TEST_ERR );
     }
 
     #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
@@ -109,7 +111,31 @@ module lending_protocol::test {
         // overpayment
         lending_protocol::repay<AptTest>(userA, borrow_amount * borrow_amount);
     }
-  
+
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_borrow_rate(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+
+        let deposit_amount = 500;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+
+
+        let borrow_amount = 1;
+        lending_protocol::borrow<AptTest>(userA, borrow_amount);
+
+        timestamp::fast_forward_seconds(4); // TODO:
+
+        let balance_before = coin::balance<AptTest>(address_of(userA));
+        let expected_repay_amount: u64 =  1 * 1 * 5 ; // TODO:
+        
+        lending_protocol::repay<AptTest>(userA, 100);
+        let balance_after = coin::balance<AptTest>(address_of(userA));
+
+        debug::print<u64>(&balance_before);
+        debug::print<u64>(&balance_after);
+        assert!(expected_repay_amount == balance_before - balance_after, ERR_TEST_ERR);
+    }
 
     // ========= test_only =========
     #[test_only]

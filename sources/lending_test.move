@@ -35,9 +35,15 @@ module lending_protocol::test {
         btc_mint: coin::MintCapability<BtcTest>,
     }
 
-    const TOTAL_VAULT: u64 = 1000000000;
-    const USER_INIT_AMOUNT: u64 = 5000;
+    // conts
+    const TOTAL_VAULT: u64 = 100000000000;
+    const USER_INIT_AMOUNT: u64 = 5000000;
+    const APT_INTEREST_RATE: u64 = 1;
+    const ETH_INTEREST_RATE: u64 = 2;
+    const BTC_INTEREST_RATE: u64 = 3;
 
+
+    // errs
     const ERR_TEST_ERR: u64 = 4444;
 
     // ========= test =========
@@ -120,14 +126,13 @@ module lending_protocol::test {
         let deposit_amount = 500;
         lending_protocol::deposit<AptTest>(userA, deposit_amount);
 
-
         let borrow_amount = 1;
         lending_protocol::borrow<AptTest>(userA, borrow_amount);
 
-        timestamp::fast_forward_seconds(4); // TODO:
+        timestamp::fast_forward_seconds(4);
 
         let balance_before = coin::balance<AptTest>(address_of(userA));
-        let expected_repay_amount: u64 =  1 * 1 * 5 ; // TODO:
+        let expected_repay_amount: u64 =  1 * 1 * 5 ;
         
         lending_protocol::repay<AptTest>(userA, 100);
         let balance_after = coin::balance<AptTest>(address_of(userA));
@@ -144,26 +149,23 @@ module lending_protocol::test {
         let deposit_amount_A = 500;
         let borrow_amount_A = 1;
         let deposit_amount_B = 1000;
-        let time_duration = 10 ;
-        let apt_intrest_rate = 1;
-         
-        
-        // userA as a borrower, provide interest
+        let time_duration = 500 ;
+
+        // userA as a borrower, provide interest && userB as a beneficiary
         lending_protocol::deposit<AptTest>(userA, deposit_amount_A);
+        lending_protocol::deposit<AptTest>(userB, deposit_amount_B);
         lending_protocol::borrow<AptTest>(userA, borrow_amount_A);
 
-        // userB as a beneficiary
-        lending_protocol::deposit<AptTest>(userB, deposit_amount_B);
         timestamp::fast_forward_seconds(time_duration);
-        let expected_withdraw_amount: u64 =  apt_intrest_rate * time_duration * borrow_amount_A + deposit_amount_B;
 
         let balance_before = coin::balance<AptTest>(address_of(userB));
-        lending_protocol::withdraw<AptTest>(userB, 1010);
+        // withdraw max amount
+        lending_protocol::withdraw<AptTest>(userB, 200000);
         let balance_after = coin::balance<AptTest>(address_of(userB));
 
         debug::print<u64>(&balance_before);
         debug::print<u64>(&balance_after);
-        assert!(expected_withdraw_amount == balance_before - balance_after, ERR_TEST_ERR);
+        assert!( 1300 == balance_after - balance_before, ERR_TEST_ERR);
     }
 
     // ========= test_only =========
@@ -238,9 +240,9 @@ module lending_protocol::test {
 
     #[test_only]
     fun init_all_pool(admin: &signer) {
-        lending_protocol::add_pool<AptTest>(admin, 1);
-        lending_protocol::add_pool<EthTest>(admin, 2);
-        lending_protocol::add_pool<BtcTest>(admin, 3);
+        lending_protocol::add_pool<AptTest>(admin, APT_INTEREST_RATE);
+        lending_protocol::add_pool<EthTest>(admin, ETH_INTEREST_RATE);
+        lending_protocol::add_pool<BtcTest>(admin, BTC_INTEREST_RATE);
     }
     
     #[test_only]

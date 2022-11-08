@@ -29,6 +29,11 @@ module lending_protocol::lending_protocol {
     // const 
     const INDEX_ONE: u128 = 100000000000000000;
     const INITIAL_EXCHANGE_RATE: u128 = 10;
+    // 1e18
+    const CALC_SCALE: u128 = 1000000000000000000;
+    // 1e10
+    const INTEREST_PRECISION: u128 = 10000000000;
+
 
     struct LendingProtocol has key, store {
         pools: vector<LendingPool>,
@@ -53,7 +58,7 @@ module lending_protocol::lending_protocol {
 
     // pool info
     struct LendingPool has key, store {
-        total_borrow: u64,
+        total_borrow: u128,
         coin_type: type_info::TypeInfo,
         borrow_index: u128,
         totoal_supply_share: u128,
@@ -72,7 +77,7 @@ module lending_protocol::lending_protocol {
 
     struct BorrowPosition has copy, drop, store {
         borrow_amount: u64,
-        intreset_index: u128,
+        interest_facotor: u128,
     }
 
     // ========= public =========
@@ -264,7 +269,7 @@ module lending_protocol::lending_protocol {
 
         // maker sure user pool exist
         if ( !simple_map::contains_key<u64, BorrowPosition>(&user_positions.borrows, &pid) ){
-            simple_map::add<u64, BorrowPosition>(&mut user_positions.borrows, pid, BorrowPosition{ borrow_amount: 0 , intreset_index: 0});
+            simple_map::add<u64, BorrowPosition>(&mut user_positions.borrows, pid, BorrowPosition{ borrow_amount: 0 , interest_facotor: 0});
         };
         let borrow_position = simple_map::borrow_mut(&mut user_positions.borrows, &pid);
 
@@ -273,9 +278,9 @@ module lending_protocol::lending_protocol {
         let account_borrow_new = borrow_balance_stored + (amount as u128);
         let borrow_total_new = (pool.total_borrow as u128) + (amount as u128);
 
-        pool.total_borrow = (borrow_total_new as u64);
+        pool.total_borrow = borrow_total_new;
         borrow_position.borrow_amount = (account_borrow_new as u64);
-        borrow_position.intreset_index = pool.borrow_index;
+        borrow_position.interest_facotor = pool.borrow_index;
 
         // transfer coin
         ensure_account_registered<CoinType>(user);
@@ -332,9 +337,9 @@ module lending_protocol::lending_protocol {
         let account_borrow_new = borrow_balance_stored - (amount as u128);
         let totoal_borrow_new = (pool.total_borrow as u128) - (amount as u128);
 
-        pool.total_borrow = (totoal_borrow_new as u64);
+        pool.total_borrow = totoal_borrow_new;
         borrow_position.borrow_amount = (account_borrow_new as u64) ;
-        borrow_position.intreset_index = pool.borrow_index;
+        borrow_position.interest_facotor = pool.borrow_index;
 
         // transfer coin
         coin::merge<CoinType>(&mut cash.coin, coin);
@@ -387,10 +392,10 @@ module lending_protocol::lending_protocol {
         if ( delta_time == 0 ) {
             return 
         };
-        let intrest_facotor = delta_time * pool.interest_per_second;
-        let interest_accumulated = pool.total_borrow * intrest_facotor;
+        let interest_facotor = (delta_time as u128) * ((pool.interest_per_second as u128) * CALC_SCALE / INTEREST_PRECISION);
+        let interest_accumulated = pool.total_borrow * interest_facotor / CALC_SCALE + 1;
         let total_borrow_new = pool.total_borrow + interest_accumulated;
-        let borrow_index_new = ( intrest_facotor as u128 ) * pool.borrow_index + pool.borrow_index;
+        let borrow_index_new = ( interest_facotor as u128 ) / CALC_SCALE * INTEREST_PRECISION  * pool.borrow_index + pool.borrow_index;
         pool.borrow_index = borrow_index_new;
         pool.last_accrued = now_sec;
         pool.total_borrow = total_borrow_new;
@@ -400,7 +405,7 @@ module lending_protocol::lending_protocol {
         if ( borrow_position.borrow_amount == 0 ) {
             return 0
         };
-        (borrow_position.borrow_amount as u128) * pool.borrow_index / borrow_position.intreset_index
+        (borrow_position.borrow_amount as u128) * pool.borrow_index / INTEREST_PRECISION / borrow_position.interest_facotor
     }
 
     fun exchange_share_rate_stored<CoinType>(pool: &LendingPool, coinStore: &CoinStore<CoinType>): u128
@@ -409,7 +414,7 @@ module lending_protocol::lending_protocol {
             return INITIAL_EXCHANGE_RATE
         };
         let balance = coin::value<CoinType>(&coinStore.coin); // TODO:
-        ((balance + pool.total_borrow) as u128 ) / pool.totoal_supply_share
+        ((balance as u128) + pool.total_borrow) / pool.totoal_supply_share
     }
 
     fun withdraw_allowd(withdraw_amont: u64): bool {

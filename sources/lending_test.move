@@ -38,7 +38,7 @@ module lending_protocol::test {
     // conts
     const TOTAL_VAULT: u64 = 100000000000;
     const USER_INIT_AMOUNT: u64 = 5000000;
-    const APT_INTEREST_RATE: u64 = 1;
+    const APT_INTEREST_RATE: u64 = 10000000000;
     const ETH_INTEREST_RATE: u64 = 2;
     const BTC_INTEREST_RATE: u64 = 3;
 
@@ -129,10 +129,10 @@ module lending_protocol::test {
         let borrow_amount = 1;
         lending_protocol::borrow<AptTest>(userA, borrow_amount);
 
-        timestamp::fast_forward_seconds(4);
+        timestamp::fast_forward_seconds(6);
 
         let balance_before = coin::balance<AptTest>(address_of(userA));
-        let expected_repay_amount: u64 =  1 * 1 * 5 ;
+        let expected_repay_amount: u64 =  1 * 1 * 6 ;
         
         lending_protocol::repay<AptTest>(userA, 100);
         let balance_after = coin::balance<AptTest>(address_of(userA));

@@ -28,11 +28,12 @@ module lending_protocol::lending_protocol {
 
     // const 
     const INDEX_ONE: u128 = 100000000000000000;
-    const INITIAL_EXCHANGE_RATE: u128 = 10;
+    const INITIAL_EXCHANGE_RATE: u128 = 10000000000;
     // 1e18
     const CALC_SCALE: u128 = 1000000000000000000;
     // 1e10
     const INTEREST_PRECISION: u128 = 10000000000;
+    const EXCHAGE_PRECISION: u128 = 1000000000;
 
 
     struct LendingProtocol has key, store {
@@ -172,11 +173,11 @@ module lending_protocol::lending_protocol {
         // calc share
         let exchange_share_rate_stored = exchange_share_rate_stored<CoinType>(pool, cash);
 
-        let actual_share_get = (amount as u128 ) / exchange_share_rate_stored;
+        let actual_share_get = (amount as u128 ) * EXCHAGE_PRECISION / exchange_share_rate_stored;
         
         // book
         user_deposit.pool_share =  user_deposit.pool_share + actual_share_get;
-        user_deposit.deposit_amount = user_deposit.deposit_amount + amount;
+        user_deposit.deposit_amount = ((user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION ) as u64);
         pool.totoal_supply_share = pool.totoal_supply_share + actual_share_get;
 
         // transfer coins
@@ -213,8 +214,8 @@ module lending_protocol::lending_protocol {
         let exchange_share_rate_stored = exchange_share_rate_stored<CoinType>(pool, cash);
         let user_deposit = simple_map::borrow_mut(&mut user_positions.deposits, &pid);
 
-        let share_to_withdraw = (amount as u128) / exchange_share_rate_stored;
-        let amount_stored = user_deposit.pool_share * exchange_share_rate_stored;
+        let share_to_withdraw = (amount as u128) * EXCHAGE_PRECISION / exchange_share_rate_stored;
+        let amount_stored = user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION;
 
         // whether to withdraw all
         let (actual_withdraw_amount, actual_withdraw_share) = if ( (amount as u128) >= amount_stored) {
@@ -227,6 +228,7 @@ module lending_protocol::lending_protocol {
 
         // book
         user_deposit.pool_share = user_deposit.pool_share - actual_withdraw_share;
+        user_deposit.deposit_amount = ((user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION) as u64);
         pool.totoal_supply_share =  pool.totoal_supply_share - actual_withdraw_share;
 
         // transfer coin
@@ -414,7 +416,7 @@ module lending_protocol::lending_protocol {
             return INITIAL_EXCHANGE_RATE
         };
         let balance = coin::value<CoinType>(&coinStore.coin); // TODO:
-        ((balance as u128) + pool.total_borrow) / pool.totoal_supply_share
+        ((balance as u128) + pool.total_borrow) * EXCHAGE_PRECISION / pool.totoal_supply_share
     }
 
     fun withdraw_allowd(withdraw_amont: u64): bool {

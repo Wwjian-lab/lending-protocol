@@ -10,7 +10,7 @@ module lending_protocol::test {
     use aptos_framework::coin;
     use aptos_framework::timestamp;
 
-    use aptos_std::debug;
+    // use aptos_std::debug;
     // use aptos_std::type_info;
 
     struct AptTest {}
@@ -93,7 +93,7 @@ module lending_protocol::test {
     }
 
     #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
-    public entry fun test_borrow(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+    public entry fun test_borrow_same_coin(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
         // init
         before_user_operate(admin, userA, userB, aptos_framework_admin);
         
@@ -101,6 +101,19 @@ module lending_protocol::test {
         lending_protocol::deposit<AptTest>(userA, deposit_amount);
         let borrow_amount = 100;
         lending_protocol::borrow<AptTest>(userA, borrow_amount);
+
+    }
+
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_borrow_diff_coin(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        // init
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+        
+        let deposit_amount = 400;
+        lending_protocol::deposit<AptTest>(userA, deposit_amount);
+        lending_protocol::deposit<EthTest>(userB, deposit_amount);
+        let borrow_amount = 100;
+        lending_protocol::borrow<EthTest>(userA, borrow_amount);
 
     }
 
@@ -137,8 +150,8 @@ module lending_protocol::test {
         lending_protocol::repay<AptTest>(userA, 100);
         let balance_after = coin::balance<AptTest>(address_of(userA));
 
-        debug::print<u64>(&balance_before);
-        debug::print<u64>(&balance_after);
+        // debug::print<u64>(&balance_before);
+        // debug::print<u64>(&balance_after);
         assert!(expected_repay_amount == balance_before - balance_after, ERR_TEST_ERR);
     }
 
@@ -163,10 +176,52 @@ module lending_protocol::test {
         lending_protocol::withdraw<AptTest>(userB, 200000);
         let balance_after = coin::balance<AptTest>(address_of(userB));
 
-        debug::print<u64>(&balance_before);
-        debug::print<u64>(&balance_after);
-        assert!( 1300 == balance_after - balance_before, ERR_TEST_ERR);
+        // debug::print<u64>(&balance_before);
+        // debug::print<u64>(&balance_after);
+        assert!( 1334 == balance_after - balance_before, ERR_TEST_ERR);
     }
+
+    #[expected_failure]
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_borrow_same_coin_over_limit(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+
+        let deposit_amount_A = 500;
+        let borrow_amount_A = 450;
+
+        lending_protocol::deposit<AptTest>(userA, deposit_amount_A);
+        lending_protocol::borrow<AptTest>(userA, borrow_amount_A);
+    }
+
+    #[expected_failure]
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_borrow_diff_coin_over_limit(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+        
+        let deposit_amount_A = 500;
+        let deposit_amount_B = 500;
+        let borrow_amount_A = 450;
+
+        lending_protocol::deposit<AptTest>(userA, deposit_amount_A);
+        lending_protocol::deposit<EthTest>(userB, deposit_amount_B);
+
+        lending_protocol::borrow<EthTest>(userA, borrow_amount_A);
+    }
+
+    #[expected_failure]
+    #[test(admin=@lending_protocol, userA=@0x1000000, userB=@0x200000, aptos_framework_admin=@0x1)]
+    public entry fun test_withdraw_fail(admin: &signer, userA: &signer, userB: &signer, aptos_framework_admin: &signer){
+        before_user_operate(admin, userA, userB, aptos_framework_admin);
+
+        let deposit_amount_A = 500;
+        let borrow_amount_A = 400;
+        let withdraw_amount_A = 50;
+
+        lending_protocol::deposit<AptTest>(userA, deposit_amount_A);
+        lending_protocol::borrow<AptTest>(userA, borrow_amount_A);
+
+        lending_protocol::withdraw<AptTest>(userA, withdraw_amount_A);
+    }  
 
     // ========= test_only =========
     #[test_only]

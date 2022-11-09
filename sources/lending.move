@@ -28,12 +28,13 @@ module lending_protocol::lending_protocol {
 
     // const 
     const INDEX_ONE: u128 = 100000000000000000;
-    const INITIAL_EXCHANGE_RATE: u128 = 10000000000;
+    const INITIAL_EXCHANGE_RATE: u128 = 1;
     // 1e18
     const CALC_SCALE: u128 = 1000000000000000000;
     // 1e10
     const INTEREST_PRECISION: u128 = 10000000000;
-    const EXCHAGE_PRECISION: u128 = 1000000000;
+    // 1e18
+    const EXCHAGE_PRECISION: u128 = 1;
 
 
     struct LendingProtocol has key, store {
@@ -68,6 +69,8 @@ module lending_protocol::lending_protocol {
         is_active: bool,
         fee_to: address,
         fee_to_events: event::EventHandle<FeeToEvent>,
+        coin_price: u64,
+        coin_balance: u64,
     }
 
     struct DepositPosition has copy, drop, store {
@@ -122,6 +125,8 @@ module lending_protocol::lending_protocol {
             last_accrued: now,
             interest_per_second: interest_rate,
             fee_to_events: sys_account::new_event_handle<FeeToEvent>(account),
+            coin_price: 0,
+            coin_balance: 0
         };
 
         move_to<CoinStore<CoinType>>(account, CoinStore<CoinType>{coin: coin::zero<CoinType>()});
@@ -170,18 +175,15 @@ module lending_protocol::lending_protocol {
 
         let user_deposit = simple_map::borrow_mut(&mut user_positions.deposits, &pid);
 
-        // calc share
-        let exchange_share_rate_stored = exchange_share_rate_stored<CoinType>(pool, cash);
-
-        let actual_share_get = (amount as u128 ) * EXCHAGE_PRECISION / exchange_share_rate_stored;
+        let actual_share_get = coin_to_share<CoinType>(pool, amount);
         
         // book
         user_deposit.pool_share =  user_deposit.pool_share + actual_share_get;
-        user_deposit.deposit_amount = ((user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION ) as u64);
         pool.totoal_supply_share = pool.totoal_supply_share + actual_share_get;
 
         // transfer coins
         coin::merge(&mut cash.coin, coin);
+        pool.coin_balance = pool.coin_balance + amount;
     }
 
     public entry fun withdraw<CoinType>(user: &signer, amount: u64) 
@@ -210,15 +212,14 @@ module lending_protocol::lending_protocol {
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
         let cash = borrow_global_mut<CoinStore<CoinType>>(@lending_protocol);
 
-        // get global params
-        let exchange_share_rate_stored = exchange_share_rate_stored<CoinType>(pool, cash);
         let user_deposit = simple_map::borrow_mut(&mut user_positions.deposits, &pid);
 
-        let share_to_withdraw = (amount as u128) * EXCHAGE_PRECISION / exchange_share_rate_stored;
-        let amount_stored = user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION;
+        let share_to_withdraw = coin_to_share<CoinType>(pool, amount);
+
+        let amount_stored = share_to_coin<CoinType>(pool, user_deposit.pool_share);
 
         // whether to withdraw all
-        let (actual_withdraw_amount, actual_withdraw_share) = if ( (amount as u128) >= amount_stored) {
+        let (actual_withdraw_amount, actual_withdraw_share) = if ( (amount as u128) >= (amount_stored as u128)) {
             ((amount_stored as u64), user_deposit.pool_share)
         } else {
             (amount, share_to_withdraw)
@@ -228,12 +229,12 @@ module lending_protocol::lending_protocol {
 
         // book
         user_deposit.pool_share = user_deposit.pool_share - actual_withdraw_share;
-        user_deposit.deposit_amount = ((user_deposit.pool_share * exchange_share_rate_stored / EXCHAGE_PRECISION) as u64);
         pool.totoal_supply_share =  pool.totoal_supply_share - actual_withdraw_share;
 
         // transfer coin
         ensure_account_registered<CoinType>(user);
         coin::deposit(signer::address_of(user), coin);
+        pool.coin_balance = pool.coin_balance - actual_withdraw_amount;
 
         assert!(get_hypothetical_account_liquidity_internal(protocol, user_positions) == true, ERR_LACK_OF_LIQUIDITY);
     }
@@ -287,6 +288,7 @@ module lending_protocol::lending_protocol {
         // transfer coin
         ensure_account_registered<CoinType>(user);
         coin::deposit(signer::address_of(user), coin);
+        pool.coin_balance = pool.coin_balance - amount;
 
         assert!(get_hypothetical_account_liquidity_internal(protocol, user_positions) == true, ERR_LACK_OF_LIQUIDITY);
     }
@@ -345,6 +347,7 @@ module lending_protocol::lending_protocol {
 
         // transfer coin
         coin::merge<CoinType>(&mut cash.coin, coin);
+        pool.coin_balance = pool.coin_balance - amount;
     }
 
     public entry fun set_open_collateral<CoinType>(user: &signer, if_open: bool) acquires LendingProtocol, UserPositions{
@@ -372,20 +375,19 @@ module lending_protocol::lending_protocol {
         coin::deposit<CoinType>(signer::address_of(admin), coin);
     }
 
+    fun coin_to_share<CoinType>(pool: &LendingPool,coin_amount: u64):u128 {
+        let total_size = total_size<CoinType>(pool);
+        lending_protocol::utils::coin_to_share(coin_amount, total_size, pool.totoal_supply_share)
+    }
 
-    // public entry fun get_account_snapshot<CoinType>(user: &signer)
-    //     acquires
-    // LendingProtocol,
-    // UserPositions 
-    // {
-    //     let protocol = borrow_global_mut<LendingProtocol>(@lending_protocol);
-    //     let pid = get_pool_id<CoinType>(protocol);
-    //     let pool = vector::borrow_mut(&mut protocol.pools, pid);
-    //     let user_positions = borrow_global<UserPositions>(signer::address_of(user));
-    //     let deposit_position = simple_map::borrow(&user_positions.deposits, &pid);
-    //     let borrow_positon = simple_map::borrow(&user_positions.borrows, &pid);
-    //     let borrow_balance_stored = get_borrow_balance_stored(pool, borrow_positon);
-    // }
+    fun share_to_coin<CoinType>(pool: &LendingPool,share_amount: u128):u64 {
+        let total_size = total_size<CoinType>(pool);
+        lending_protocol::utils::share_to_coin(share_amount, total_size, pool.totoal_supply_share)
+    }
+
+    fun total_size<CoinType>(pool: &LendingPool): u128  {
+        pool.total_borrow + (pool.coin_balance as u128)
+    }
 
     // ========= internal =========
     fun accrue_interest(pool: &mut LendingPool) {
@@ -415,7 +417,7 @@ module lending_protocol::lending_protocol {
         if ( pool.totoal_supply_share == 0 ) {
             return INITIAL_EXCHANGE_RATE
         };
-        let balance = coin::value<CoinType>(&coinStore.coin); // TODO:
+        let balance = coin::value<CoinType>(&coinStore.coin);
         ((balance as u128) + pool.total_borrow) * EXCHAGE_PRECISION / pool.totoal_supply_share
     }
 
@@ -450,8 +452,12 @@ module lending_protocol::lending_protocol {
             // if user have deposited this coin
             if ( simple_map::contains_key<u64, DepositPosition>(&user_position.deposits, &idx) ){
                 let user_deposit_postision = simple_map::borrow<u64, DepositPosition>(&user_position.deposits, &idx);
+                let total_pool_size = (pool.coin_balance as u128) + pool.total_borrow;
+
+                let user_deposit_amount = lending_protocol::utils::share_to_coin(user_deposit_postision.pool_share, total_pool_size, pool.totoal_supply_share);
+
                 if ( user_deposit_postision.as_collateral ){
-                    total_colleteral_USD_value = total_colleteral_USD_value + user_deposit_postision.deposit_amount * oracle::get_usd_price(coin_type);
+                    total_colleteral_USD_value = total_colleteral_USD_value + user_deposit_amount * oracle::get_usd_price(coin_type);
                 } else {
                     continue
                 };

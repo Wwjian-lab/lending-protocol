@@ -69,7 +69,6 @@ module lending_protocol::test {
         lending_protocol::deposit<AptTest>(userA, deposit_amount);
 
         // assert balance
-        // debug::print<u64>(&coin::balance<AptTest>(address_of(userA)));
         assert!( coin::balance<AptTest>(address_of(userA)) == USER_INIT_AMOUNT - 2 * deposit_amount, ERR_TEST_ERR );
     }
 
@@ -150,8 +149,6 @@ module lending_protocol::test {
         lending_protocol::repay<AptTest>(userA, 100);
         let balance_after = coin::balance<AptTest>(address_of(userA));
 
-        // debug::print<u64>(&balance_before);
-        // debug::print<u64>(&balance_after);
         assert!(expected_repay_amount == balance_before - balance_after, ERR_TEST_ERR);
     }
 
@@ -176,9 +173,7 @@ module lending_protocol::test {
         lending_protocol::withdraw<AptTest>(userB, 200000);
         let balance_after = coin::balance<AptTest>(address_of(userB));
 
-        // debug::print<u64>(&balance_before);
-        // debug::print<u64>(&balance_after);
-        assert!( 1334 == balance_after - balance_before, ERR_TEST_ERR);
+        assert!( 1333 == balance_after - balance_before, ERR_TEST_ERR);
     }
 
     #[expected_failure]

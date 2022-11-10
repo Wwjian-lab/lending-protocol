@@ -152,7 +152,7 @@ module lending_protocol::lending_protocol {
         // get pid && pool
         let pid = get_pool_id<CoinType>(protocol);
         let pool = vector::borrow_mut(&mut protocol.pools, pid);
-        assert!(pool.is_active == true, ERR_POOL_NOT_ACTIVE);
+        assert!( pool.is_active , ERR_POOL_NOT_ACTIVE);
 
         // accrue interest
         accrue_interest(pool);
@@ -199,7 +199,7 @@ module lending_protocol::lending_protocol {
         // get pool id && pool
         let pid = get_pool_id<CoinType>(protocol);
         let pool = vector::borrow_mut(&mut protocol.pools, pid);
-        assert!(pool.is_active == true, ERR_POOL_NOT_ACTIVE);
+        assert!( pool.is_active, ERR_POOL_NOT_ACTIVE);
 
         assert_coin_type<CoinType>(pool.coin_type);
 
@@ -207,7 +207,7 @@ module lending_protocol::lending_protocol {
         accrue_interest(pool);
 
         // withdraw check
-        assert!(withdraw_allowd(amount) == true, ERR_INSUFFICIENT_COLLATERAL);
+        assert!( withdraw_allowd(amount), ERR_INSUFFICIENT_COLLATERAL);
 
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
         let cash = borrow_global_mut<CoinStore<CoinType>>(@lending_protocol);
@@ -236,7 +236,7 @@ module lending_protocol::lending_protocol {
         coin::deposit(signer::address_of(user), coin);
         pool.coin_balance = pool.coin_balance - actual_withdraw_amount;
 
-        assert!(get_hypothetical_account_liquidity_internal(protocol, user_positions) == true, ERR_LACK_OF_LIQUIDITY);
+        assert!( get_hypothetical_account_liquidity_internal(protocol, user_positions), ERR_LACK_OF_LIQUIDITY);
     }
 
     public entry fun borrow<CoinType>(user: &signer, amount: u64)
@@ -253,7 +253,7 @@ module lending_protocol::lending_protocol {
         // get pid && pool
         let pid = get_pool_id<CoinType>(protocol);
         let pool = vector::borrow_mut(&mut protocol.pools, pid);
-        assert!(pool.is_active == true, ERR_POOL_NOT_ACTIVE);
+        assert!( pool.is_active, ERR_POOL_NOT_ACTIVE);
 
         assert_coin_type<CoinType>(pool.coin_type);
 
@@ -261,7 +261,7 @@ module lending_protocol::lending_protocol {
         accrue_interest(pool);
 
         // borrow check
-        assert!(borrow_allowed(amount) == true, ERR_INSUFFICIENT_COLLATERAL);
+        assert!( borrow_allowed(amount), ERR_INSUFFICIENT_COLLATERAL);
 
         // get global params
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
@@ -290,7 +290,7 @@ module lending_protocol::lending_protocol {
         coin::deposit(signer::address_of(user), coin);
         pool.coin_balance = pool.coin_balance - amount;
 
-        assert!(get_hypothetical_account_liquidity_internal(protocol, user_positions) == true, ERR_LACK_OF_LIQUIDITY);
+        assert!( get_hypothetical_account_liquidity_internal(protocol, user_positions), ERR_LACK_OF_LIQUIDITY);
     }
 
     public entry fun repay<CoinType>(user: &signer, amount: u64)
@@ -319,7 +319,7 @@ module lending_protocol::lending_protocol {
         acquires
         CoinStore
     {
-        assert!(pool.is_active == true, ERR_POOL_NOT_ACTIVE);
+        assert!( pool.is_active, ERR_POOL_NOT_ACTIVE);
 
         assert_coin_type<CoinType>(pool.coin_type);
 
@@ -358,7 +358,7 @@ module lending_protocol::lending_protocol {
         let user_positions = borrow_global_mut<UserPositions>(signer::address_of(user));
         let deposit_position = simple_map::borrow_mut(&mut user_positions.deposits, &pid);
         deposit_position.as_collateral = if_open;
-        assert!(get_hypothetical_account_liquidity_internal(protocol, user_positions) == true, ERR_LACK_OF_LIQUIDITY);
+        assert!( get_hypothetical_account_liquidity_internal(protocol, user_positions), ERR_LACK_OF_LIQUIDITY);
     }
 
     public entry fun deactivate_pool<CoinType>() acquires LendingProtocol {
